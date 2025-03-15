@@ -96,7 +96,8 @@ def load_and_prepare_data(train_file, test_file, model_name, num_labels=2):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def preprocess_function(examples):
-        return tokenizer(examples["text"], truncation=True, padding="max_length", max_length=128)
+        return tokenizer(examples["title"], truncation=True, padding="max_length", max_length=128)
+
 
     # Apply tokenization
     tokenized_datasets = raw_datasets.map(preprocess_function, batched=True)
