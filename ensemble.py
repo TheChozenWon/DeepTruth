@@ -145,7 +145,7 @@ def train_with_raytune(model_init_func, model_name, train_file, test_file, hp_sp
     best_run = trainer.hyperparameter_search(
         direction="maximize",
         backend="ray",
-        n_trials=20, 
+        n_trials=50, 
         hp_space=hp_space_func,
         compute_objective=lambda metrics: metrics["eval_f1"],  # or eval_accuracy
     )
