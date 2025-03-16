@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepTruth Extension</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <img src="images/icon48.png" alt="Extension Icon" class="header-icon">
+            <h1>DeepTruth</h1>
+        </header>
+        
+        <div class="action-card">
+            <h1 id="title">Analysis Result!</h1>
+            <div id="loading-indicator" style="display: flex; align-items: center; justify-content: center; margin: 20px 0;">
+                <div class="spinner"></div>
+                <p style="margin-left: 10px;">Analyzing...</p>
+            </div>
+            <h2 id="veracity"></h2>
+            <h2 id="credibility"></h2>
+            <h2 id="impact-level"></h2>
+            <p id="reason"></p>
+        </div>
+        
+        <div>
+            <button id="close">Close</button>
+        </div>
+    </div>
+
+    <footer class="footer">
+            
+    </footer>
+    <script src="popup.js"></script>
+</body>
+
+</html> 
