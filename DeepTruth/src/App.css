@@ -1,0 +1,117 @@
+@keyframes circleNeonGlow {
+  0% {
+    filter: drop-shadow(0 0 2px #b700ff) drop-shadow(0 0 4px #b700ff);
+  }
+  50% {
+    filter: drop-shadow(0 0 5px #b700ff) drop-shadow(0 0 10px #b700ff)
+      drop-shadow(0 0 15px #00ffcc);
+  }
+  100% {
+    filter: drop-shadow(0 0 2px #b700ff) drop-shadow(0 0 4px #b700ff);
+  }
+}
+
+body {
+  font-family: sans-serif;
+  margin: 0;
+  padding: 20px;
+  display: flex;
+  justify-content: center; /* Center horizontally */
+  align-items: center; /* Center vertically */
+  background-color: black;
+}
+
+h1 {
+  text-align: center;
+  font-size: 7em;
+  font-weight: bold;
+  color: white(32, 32, 187);
+  text-shadow: 0 0 5px grey, 0 0 10px grey, 0 0 20px grey, 0 0 40px grey,
+    0 0 80px grey; /* Strong neon glow */
+  letter-spacing: 2px;
+  padding: 20px;
+  font-family: "Arial", sans-serif;
+  animation: neonGlow 1.5s infinite alternate;
+}
+
+button {
+  background-color: #4caf50;
+  color: white;
+  padding: 10px 20px;
+  margin: 5px;
+  border: none;
+  cursor: pointer;
+}
+
+input[type="text"] {
+  width: 600px;
+  max-width: 100%; /* Ensures responsiveness */
+  padding: 8px;
+  margin: 5px;
+  border: 1px solid #ff0000;
+  border-radius: 8px;
+  font-size: 1.2em;
+}
+
+#loading,
+#auth,
+#explain {
+  font-size: 5em;
+}
+
+#load {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.credibility-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.credibility-text {
+  position: absolute;
+  font-weight: bold;
+  color: white;
+}
+
+#explanation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+  width: 100%;
+}
+
+ul {
+  display: flex;
+  justify-content: space-evenly;
+  list-style-type: none;
+  padding: 0;
+  width: "100%";
+}
+
+.neon-circular-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.neon-percentage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: bold;
+  color: #ffffff;
+  animation: neonGlow 1.5s infinite alternate;
+}
