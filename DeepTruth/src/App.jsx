@@ -1,20 +1,36 @@
 import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { Player } from "@lottiefiles/react-lottie-player";
+<<<<<<< HEAD
 import animationData from "./loading.json"; // Path to your animation file
 import "./Nav.css";
 import "./App.css";
+=======
+import animationData from "./loading.json";
+import "./Nav.css";
+import "./App.css";
+import axios from "axios";
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
 
 function App() {
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
+<<<<<<< HEAD
   const [credibility, setCredibility] = useState(0); // Start with 0
   const [authenticity, setAuthenticity] = useState(null);
   const [explanation, setExplanation] = useState("");
   const [sources, setSources] = useState([]);
   const [goClicked, setGoClicked] = useState(false); // Track if Go button is clicked
   const [animatedCredibility, setAnimatedCredibility] = useState(0); // Animated credibility percentage
+=======
+  const [credibility, setCredibility] = useState(0);
+  const [authenticity, setAuthenticity] = useState(null);
+  const [explanation, setExplanation] = useState("");
+  const [sources, setSources] = useState([]);
+  const [goClicked, setGoClicked] = useState(false);
+  const [animatedCredibility, setAnimatedCredibility] = useState(0);
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
 
   const handleSearchClick = () => {
     setSearchVisible(true);
@@ -22,6 +38,7 @@ function App() {
 
   const handleGoClick = () => {
     setLoading(true);
+<<<<<<< HEAD
     setGoClicked(true); // Set goClicked to true after clicking Go
     setTimeout(() => {
       setLoading(false);
@@ -38,6 +55,42 @@ function App() {
         { url: "https://example.com/source5", title: "Source 5" },
       ]);
     }, 2000); // Simulate loading time
+=======
+    setGoClicked(true);
+    
+    axios.post('http://127.0.0.1:8000/api/verify-claim/', { article_title: searchText })
+      .then(response => {
+        setLoading(false);
+        const data = response.data;
+        setCredibility(data.confidence_score * 100);
+        setAuthenticity(data.veracity);
+        setExplanation(data.explanation);
+        
+        // Convert the sources string to an array and format for display
+        let sourcesArray = [];
+        try {
+          // Remove the single quotes and square brackets from the string
+          const sourcesString = data.sources.replace(/^\['|'\]$/g, '').replace(/'\s*,\s*'/g, ',');
+          sourcesArray = sourcesString.split(',').map((url, index) => ({
+            url: url,
+            title: `Source ${index + 1}`
+          }));
+        } catch (error) {
+          console.error("Error parsing sources:", error);
+          sourcesArray = [];
+        }
+        
+        setSources(sourcesArray);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        setLoading(false);
+        setCredibility(0);
+        setAuthenticity(null);
+        setExplanation("An error occurred while verifying the claim.");
+        setSources([]);
+      });
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
   };
 
   const handleResetClick = () => {
@@ -48,15 +101,22 @@ function App() {
     setAuthenticity(null);
     setExplanation("");
     setSources([]);
+<<<<<<< HEAD
     setGoClicked(false); // Reset goClicked state to false
   };
 
   // Animate the credibility percentage
+=======
+    setGoClicked(false);
+  };
+
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
   useEffect(() => {
     if (goClicked) {
       const interval = setInterval(() => {
         setAnimatedCredibility((prev) => {
           if (prev < credibility) {
+<<<<<<< HEAD
             return Math.min(prev + 1, credibility); // Increase the percentage
           }
           clearInterval(interval);
@@ -89,6 +149,29 @@ function App() {
             height={size}
             style={{ transform: "rotate(-90deg)" }}
           >
+=======
+            return Math.min(prev + 1, credibility);
+          }
+          clearInterval(interval);
+          return prev;
+        });
+      }, 20);
+
+      return () => clearInterval(interval);
+    }
+  }, [credibility, goClicked]);
+
+  const renderCircularProgress = (percentage, size = 150, thickness = 10) => {
+    const normalizedPercentage = Math.min(100, Math.max(0, percentage));
+    const radius = (size - thickness) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (normalizedPercentage / 100) * circumference;
+
+    return (
+      <div className="neon-circular-progress" style={{ display: "flex", alignItems: "center" }}>
+        <div style={{ position: "relative" }}>
+          <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
             <circle
               cx={size / 2}
               cy={size / 2}
@@ -97,7 +180,10 @@ function App() {
               stroke="rgba(255, 255, 255, 0.1)"
               strokeWidth={thickness}
             />
+<<<<<<< HEAD
             {/* Progress circle with neon glow effect */}
+=======
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
             <circle
               cx={size / 2}
               cy={size / 2}
@@ -111,7 +197,10 @@ function App() {
               className="neon-glow-circle"
             />
           </svg>
+<<<<<<< HEAD
           {/* Percentage text with neon glow */}
+=======
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
           <div
             className="neon-percentage"
             style={{
@@ -123,7 +212,11 @@ function App() {
               color: "#b700ff",
             }}
           >
+<<<<<<< HEAD
             {normalizedPercentage}%
+=======
+            {Math.round(normalizedPercentage)}%
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
           </div>
         </div>
       </div>
@@ -134,7 +227,10 @@ function App() {
     <React.Fragment>
       <h1>News Credibility Checker</h1>
 
+<<<<<<< HEAD
       {/* Show the Search and Go button before Go is clicked */}
+=======
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
       {!goClicked && (
         <React.Fragment>
           <button onClick={handleSearchClick}>Search</button>
@@ -153,10 +249,15 @@ function App() {
         </React.Fragment>
       )}
 
+<<<<<<< HEAD
       {/* Show the Reset button after Go is clicked */}
       {goClicked && <button onClick={handleResetClick}>Reset</button>}
 
       {/* Loading animation and text side by side */}
+=======
+      {goClicked && <button onClick={handleResetClick}>Reset</button>}
+
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
       {loading && (
         <div
           style={{
@@ -176,7 +277,10 @@ function App() {
         </div>
       )}
 
+<<<<<<< HEAD
       {/* Credibility, Circle, Authenticity, and Sources (Hidden until Go is pressed) */}
+=======
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
       {!loading && credibility !== 0 && (
         <React.Fragment>
           <div id="load">

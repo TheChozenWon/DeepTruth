@@ -10,6 +10,10 @@
   },
   "dependencies": {
     "@lottiefiles/react-lottie-player": "^3.6.0",
+<<<<<<< HEAD
+=======
+    "axios": "^1.8.3",
+>>>>>>> e854858dac1310f00e8422fcdf4498f38f519133
     "lottie-react": "^2.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
