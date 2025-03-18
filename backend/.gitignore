@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Environment variables
 .env
 
@@ -44,3 +45,33 @@ media/
 # OS
 .DS_Store
 Thumbs.db 
+=======
+# Model checkpoints and results
+distil_results/
+distill_results/
+bert_results/
+**/runs/
+
+# Model files
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.onnx
+*.h5
+
+# TensorBoard logs
+events.out.tfevents.*
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.env/
+
+>>>>>>> b17113cdf1485840315015b9664864ce6569bd62
