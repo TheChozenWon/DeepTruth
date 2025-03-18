@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Environment variables
 .env
 
@@ -45,7 +45,6 @@ media/
 # OS
 .DS_Store
 Thumbs.db 
-=======
 # Model checkpoints and results
 distil_results/
 distill_results/
@@ -74,4 +73,3 @@ venv/
 env/
 .env/
 
->>>>>>> b17113cdf1485840315015b9664864ce6569bd62
