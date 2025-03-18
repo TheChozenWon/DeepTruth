@@ -137,7 +137,7 @@ function App() {
 
   return (
     <React.Fragment>
-      <h1>News Credibility Checker</h1>
+      <h1>Fake News Checker</h1>
 
       {!goClicked && (
         <React.Fragment>
