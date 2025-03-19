@@ -47,9 +47,15 @@ class VerifyClaimAPIView(APIView):
 
             return Response(response_data, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
+        except ValueError as e:
             return Response(
                 {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            print(f"Error in VerifyClaimAPIView: {str(e)}")
+            return Response(
+                {'error': 'An unexpected error occurred while processing your request'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
