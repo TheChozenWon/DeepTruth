@@ -6,6 +6,10 @@ import os
 from django.conf import settings
 from typing import List, Dict, Any
 import time
+import google.generativeai as genai
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+import torch
+import numpy as np
 
 class BraveNewsService:
     def __init__(self):
@@ -82,162 +86,134 @@ class BraveNewsService:
                 'retrieved_at': datetime.now().isoformat()
             }]
 
+class DistilBERTService:
+    def __init__(self):
+        self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        self.model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased')
+        self.model.eval()  # Set to evaluation mode
+
+    def analyze_claim(self, title: str) -> float:
+        """
+        Analyze the claim using DistilBERT model
+        Returns confidence score between 0 and 1
+        """
+        try:
+            # Tokenize the input
+            inputs = self.tokenizer(title, 
+                                  return_tensors="pt", 
+                                  truncation=True, 
+                                  max_length=512,
+                                  padding=True)
+
+            # Get prediction
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                probabilities = torch.softmax(outputs.logits, dim=1)
+                confidence_score = probabilities[0][1].item()  # Assuming 1 is true class
+
+            return confidence_score
+        except Exception as e:
+            print(f"DistilBERT Error: {str(e)}")
+            return 0.5  # Return neutral score on error
+
 class GeminiService:
     def __init__(self):
-        self.api_key = settings.GEMINI_API_KEY
-        if not self.api_key:
-            raise ValueError("GEMINI_API_KEY is not set")
-        
-        # Update to use gemini-2.0-flash model
-        self.api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not found in environment variables")
+        genai.configure(api_key=api_key)
+        self.model = genai.get_model('gemini-1.0-pro')
 
-    def analyze_claim(self, article_title: str, news_articles: List[Dict[str, str]]) -> Dict[str, Any]:
-        # Prepare the context from news articles with numbered sources
-        context = "\n\n".join([
-            f"Source {i+1}:\nTitle: {article['title']}\nSource: {article['source']}\nSummary: {article['snippet']}\nURL: {article['link']}\n"
-            for i, article in enumerate(news_articles) if article['title'] != 'Error fetching news'
-        ])
-
-        # Updated prompt with more emphasis on detailed explanation
-        prompt = f"""
-        Analyze this claim: "{article_title}"
-        
-        Based on these news sources:
-        {context}
-        
-        Provide a comprehensive fact-check analysis in the following JSON format:
-        {{
-            "veracity": false,  # boolean: true if claim is true, false if misleading/false
-            "confidence_score": 0.85,  # float between 0 and 1
-            "explanation": "Provide an extremely detailed explanation that thoroughly analyzes the claim using information from ALL five sources. For each source, explain how it supports or refutes the claim. Connect the evidence from different sources to form a comprehensive analysis. Include specific details mentioned in the sources and explain their relevance to the claim's veracity. The explanation should be at least 250 words long and reference each source by name",
-            "category": "Politics/Technology/Health/etc",
-            "key_findings": [
-                "Detailed key point 1 with source reference",
-                "Detailed key point 2 with source reference",
-                "Detailed key point 3 with source reference",
-                "Detailed key point 4 with source reference",
-                "Detailed key point 5 with source reference"
-            ],
-            "impact_level": "VERIFIED/MISLEADING/PARTIAL",
-            "sources": ["source1_url", "source2_url", "source3_url", "source4_url", "source5_url"]
-        }}
-        
-        Requirements for the analysis:
-        1. The explanation must be at least 250 words long
-        2. Each source must be referenced by name in the explanation
-        3. Key findings must cite specific sources
-        4. Explain how each source supports or contradicts the claim
-        5. Connect evidence across sources to form a comprehensive analysis
-        6. Include specific quotes or data points from the sources
-        7. Explain the reasoning behind the confidence score
-        
-        Only respond with the JSON object, no other text.
-        """
-
+    def analyze_claim(self, title: str, news_articles: List[Dict[str, Any]]) -> Dict[str, Any]:
         try:
-            # Prepare the request payload according to Gemini API specs
-            payload = {
-                "contents": [{
-                    "parts": [{"text": prompt}]
-                }]
-            }
+            # Format the context from news articles
+            context = "\n\n".join([
+                f"Source {i+1}:\nTitle: {article.get('title', '')}\nURL: {article.get('link', '')}\n"
+                for i, article in enumerate(news_articles)
+            ])
 
-            # Make the API request with the key as a query parameter
-            url = f"{self.api_url}?key={self.api_key}"
-            headers = {
-                "Content-Type": "application/json"
-            }
+            # Create the prompt
+            prompt = f"""Analyze this claim: "{title}"
 
-            # Print request details for debugging
-            print(f"Making request to Gemini API: {url}")
-            print(f"Request payload: {json.dumps(payload, indent=2)}")
+Context from news sources:
+{context}
 
-            response = requests.post(
-                url,
-                headers=headers,
-                json=payload,
-                timeout=30
-            )
+Provide a detailed fact-check analysis in JSON format with the following fields:
+- veracity (boolean): true if claim is verified, false if misleading
+- confidence_score (float between 0-1): how confident the analysis is
+- explanation (string, min 250 words): detailed analysis referencing sources
+- category (string): type of claim
+- key_findings (list): main points from analysis
+- impact_level (string): one of ["VERIFIED", "MISLEADING", "PARTIAL"]
+- sources (list): URLs of relevant sources
+
+Requirements:
+1. Reference each source by name/number in explanation
+2. Connect evidence across sources
+3. Include specific quotes/data points
+4. Explain reasoning for confidence score
+5. Minimum 250-word explanation
+6. Clear true/false determination
+7. List key findings with citations"""
+
+            # Get response from Gemini
+            response = self.model.generate_content(prompt)
             
-            # Print response for debugging
-            print(f"Gemini API Response Status: {response.status_code}")
-            print(f"Gemini API Response: {response.text}")
-            
-            response.raise_for_status()
-            
-            # Parse the response according to Gemini API format
-            response_data = response.json()
-            
-            # Handle the response format for gemini-2.0-flash
-            if 'candidates' in response_data and len(response_data['candidates']) > 0:
-                response_text = response_data['candidates'][0]['content']['parts'][0]['text']
-            else:
-                print(f"Unexpected response format: {response_data}")
-                raise ValueError("No valid response from Gemini API")
-            
-            # Clean up the response text to ensure valid JSON
-            response_text = response_text.strip()
-            if response_text.startswith('```json'):
-                response_text = response_text[7:]
-            if response_text.endswith('```'):
-                response_text = response_text[:-3]
-            response_text = response_text.strip()
-            
-            # Parse the response and ensure it's valid JSON
-            result = json.loads(response_text)
-            
-            # Ensure all required fields are present
-            required_fields = ['veracity', 'confidence_score', 'explanation', 
-                             'category', 'key_findings', 'impact_level', 'sources']
-            
-            for field in required_fields:
-                if field not in result:
-                    raise KeyError(f"Missing required field: {field}")
-            
-            # Ensure confidence_score is between 0 and 1
-            result['confidence_score'] = max(0.0, min(1.0, float(result['confidence_score'])))
-            
-            # Ensure we have the source URLs from the news articles
-            if 'sources' not in result or not result['sources']:
-                result['sources'] = [article['link'] for article in news_articles if article['link']][:5]
-            
+            if not response or not response.text:
+                raise ValueError("Empty response from Gemini API")
+
+            # Parse the response
+            try:
+                result = json.loads(response.text)
+            except json.JSONDecodeError:
+                # If JSON parsing fails, try to extract JSON from the text
+                text = response.text
+                start = text.find('{')
+                end = text.rfind('}') + 1
+                if start != -1 and end != 0:
+                    result = json.loads(text[start:end])
+                else:
+                    raise ValueError("Could not parse JSON from response")
+
             return result
-            
-        except requests.exceptions.RequestException as e:
-            print(f"Request error in Gemini analysis: {e}")
-            return {
-                'veracity': False,
-                'confidence_score': 0.5,
-                'explanation': f"Error making request to Gemini API: {str(e)}",
-                'category': 'Error',
-                'key_findings': ['API request failed'],
-                'impact_level': 'PARTIAL',
-                'sources': [article['link'] for article in news_articles if article['link']][:5]
-            }
-        except json.JSONDecodeError as e:
-            print(f"JSON parsing error in Gemini analysis: {e}")
-            return {
-                'veracity': False,
-                'confidence_score': 0.5,
-                'explanation': f"Error parsing Gemini API response: {str(e)}",
-                'category': 'Error',
-                'key_findings': ['Invalid response format'],
-                'impact_level': 'PARTIAL',
-                'sources': [article['link'] for article in news_articles if article['link']][:5]
-            }
+
         except Exception as e:
-            print(f"Error in Gemini analysis: {e}")
+            print(f"Gemini Error: {str(e)}")
             return {
-                'veracity': False,
-                'confidence_score': 0.5,
-                'explanation': f"Error analyzing claim: {str(e)}",
-                'category': 'Unknown',
-                'key_findings': ['Error in analysis'],
-                'impact_level': 'PARTIAL',
-                'sources': [article['link'] for article in news_articles if article['link']][:5]
+                "veracity": False,
+                "confidence_score": 0.0,
+                "explanation": f"Error processing request: {str(e)}",
+                "category": "Error",
+                "key_findings": [],
+                "impact_level": "MISLEADING",
+                "sources": []
             }
 
-    def _determine_impact_level(self, content: str) -> str:
-        """Helper method to determine impact level based on content analysis"""
-        # Add your impact level determination logic here
-        return 'MEDIUM'  # Default return 
+class CombinedAnalysisService:
+    def __init__(self):
+        self.distilbert_service = DistilBERTService()
+        self.gemini_service = GeminiService()
+        self.gemini_weight = 0.7  # Giving more weight to Gemini
+        self.distilbert_weight = 0.3
+
+    def analyze_claim(self, title: str, news_articles: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Get DistilBERT analysis
+        distilbert_score = self.distilbert_service.analyze_claim(title)
+        
+        # Get Gemini analysis
+        gemini_result = self.gemini_service.analyze_claim(title, news_articles)
+        gemini_score = gemini_result["confidence_score"]
+
+        # Calculate weighted average confidence score
+        combined_score = (gemini_score * self.gemini_weight + 
+                        distilbert_score * self.distilbert_weight)
+
+        # Update the Gemini result with combined score
+        gemini_result["confidence_score"] = combined_score
+        gemini_result["model_scores"] = {
+            "distilbert_score": distilbert_score,
+            "gemini_score": gemini_score,
+            "combined_score": combined_score
+        }
+
+        return gemini_result 
