@@ -76,9 +76,9 @@ python manage.py runserver
 
 ### Frontend Setup
 
-1. Navigate to the frontend directory:
+1. Navigate to the Deeptruth directory:
 ```bash
-cd ../frontend
+cd ../Deeptruth
 ```
 
 2. Install dependencies:
