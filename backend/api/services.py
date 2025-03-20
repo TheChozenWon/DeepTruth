@@ -4,13 +4,16 @@ import json
 from datetime import datetime
 import os
 from django.conf import settings
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import time
 import google.generativeai as genai
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification, AdamW
 import torch
 import numpy as np
 from django.utils import timezone
+from torch.utils.data import Dataset, DataLoader
+from sklearn.model_selection import train_test_split
+import logging
 
 
 class BraveNewsService:
@@ -69,7 +72,7 @@ class BraveNewsService:
                     except Exception as e:
                         print(f"Error parsing individual result: {e}")
                         continue
-            # print(brave_news)
+            # print("BRAVE NEWS: ",brave_news)
             # If we couldn't find any valid results, return a default response
             if not brave_news:
                 return [{
@@ -297,19 +300,23 @@ class CombinedAnalysisService:
         """
         try:
             # Get news articles from Brave Search
-            news_articles = self.brave_service.get_news_articles(article_title)
-
+            brave_news = self.brave_service.get_news_articles(article_title)
+            
             # Get Gemini analysis
-            gemini_result = self.gemini_service.analyze_claim(article_title, news_articles)  
-                        
+            gemini_result = self.gemini_service.analyze_claim(article_title, brave_news)
+            
             # Get DistilBERT analysis
             distilbert_score = self.distilbert_service.analyze_claim(article_title)
-          
             
-            # Combine results
-            combined_score = (gemini_result['confidence_score'] + distilbert_score) / 2
+            # Combine results with weighted scores
+            combined_score = ((gemini_result['confidence_score'] * 0.7) + (distilbert_score * 0.3))
             
-            # print("COMBINED SCORE: ", combined_score)
+            # Process sources from both Gemini and Brave
+            gemini_sources = gemini_result.get('sources', [])
+            brave_sources = [article.get('link', '') for article in brave_news if article.get('link')]
+            
+            # Combine and deduplicate sources
+            all_sources = list(set(gemini_sources + brave_sources))
             
             # Create result dictionary
             result = {
@@ -319,11 +326,11 @@ class CombinedAnalysisService:
                 'category': gemini_result['category'],
                 'key_findings': gemini_result['key_findings'],
                 'impact_level': gemini_result['impact_level'],
-                'sources': news_articles,
+                'sources': all_sources,  # Use combined and deduplicated sources
                 'created_at': timezone.now(),
                 'updated_at': timezone.now()
             }
-            # print(result)
+            
             return result
 
         except Exception as e:
@@ -338,4 +345,152 @@ class CombinedAnalysisService:
                 'sources': [],
                 'created_at': timezone.now(),
                 'updated_at': timezone.now()
+            }
+
+
+class NewsDataset(Dataset):
+    def __init__(self, texts: List[str], labels: List[int], tokenizer: DistilBertTokenizer, max_length: int = 512):
+        self.encodings = tokenizer(texts, truncation=True, padding=True, max_length=max_length, return_tensors='pt')
+        self.labels = labels
+
+    def __getitem__(self, idx):
+        item = {key: val[idx] for key, val in self.encodings.items()}
+        item['labels'] = torch.tensor(self.labels[idx])
+        return item
+
+    def __len__(self):
+        return len(self.labels)
+
+
+class ModelTrainingService:
+    def __init__(self):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
+        self.model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-uncased', num_labels=2)
+        self.model.to(self.device)
+        self.logger = logging.getLogger(__name__)
+
+    def prepare_training_data(self, true_news: List[Dict[str, Any]], false_news: List[Dict[str, Any]]) -> Tuple[List[str], List[int]]:
+        """Prepare training data from MongoDB collections"""
+        texts = []
+        labels = []
+        
+        # Add true news
+        for news in true_news:
+            texts.append(news['article_title'])
+            labels.append(1)  # 1 for true
+            
+        # Add false news
+        for news in false_news:
+            texts.append(news['article_title'])
+            labels.append(0)  # 0 for false
+            
+        return texts, labels
+
+    def train_model(self, texts: List[str], labels: List[int], epochs: int = 3, batch_size: int = 8) -> bool:
+        """Train the model on the provided data"""
+        try:
+            # Split data into train and validation sets
+            train_texts, val_texts, train_labels, val_labels = train_test_split(
+                texts, labels, test_size=0.2, random_state=42
+            )
+
+            # Create datasets
+            train_dataset = NewsDataset(train_texts, train_labels, self.tokenizer)
+            val_dataset = NewsDataset(val_texts, val_labels, self.tokenizer)
+
+            # Create dataloaders
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=batch_size)
+
+            # Setup optimizer
+            optimizer = AdamW(self.model.parameters(), lr=2e-5)
+
+            # Training loop
+            self.model.train()
+            for epoch in range(epochs):
+                total_loss = 0
+                for batch in train_loader:
+                    optimizer.zero_grad()
+                    input_ids = batch['input_ids'].to(self.device)
+                    attention_mask = batch['attention_mask'].to(self.device)
+                    labels = batch['labels'].to(self.device)
+
+                    outputs = self.model(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        labels=labels
+                    )
+
+                    loss = outputs.loss
+                    total_loss += loss.item()
+
+                    loss.backward()
+                    optimizer.step()
+
+                avg_loss = total_loss / len(train_loader)
+                self.logger.info(f"Epoch {epoch + 1}, Average Loss: {avg_loss:.4f}")
+
+            # Save the model
+            model_path = os.path.join(settings.BASE_DIR, 'models', 'distilbert_finetuned')
+            os.makedirs(model_path, exist_ok=True)
+            self.model.save_pretrained(model_path)
+            self.tokenizer.save_pretrained(model_path)
+            
+            self.logger.info(f"Model saved successfully to {model_path}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Error during model training: {str(e)}")
+            return False
+
+    def retrain_model(self) -> Dict[str, Any]:
+        """Retrain the model using data from MongoDB"""
+        try:
+            from .models import TrueNews, FalseNews
+            
+            # Get data from MongoDB
+            true_news = list(TrueNews.objects.values('article_title'))
+            false_news = list(FalseNews.objects.values('article_title'))
+            
+            if not true_news or not false_news:
+                return {
+                    'success': False,
+                    'message': 'Insufficient data for training',
+                    'true_news_count': len(true_news),
+                    'false_news_count': len(false_news)
+                }
+
+            # Prepare training data
+            texts, labels = self.prepare_training_data(true_news, false_news)
+            
+            # Train the model
+            success = self.train_model(texts, labels)
+            
+            if success:
+                # Clear the training data from MongoDB
+                TrueNews.objects.all().delete()
+                FalseNews.objects.all().delete()
+                
+                return {
+                    'success': True,
+                    'message': 'Model retrained successfully and training data cleared',
+                    'true_news_count': len(true_news),
+                    'false_news_count': len(false_news)
+                }
+            else:
+                return {
+                    'success': False,
+                    'message': 'Model training failed',
+                    'true_news_count': len(true_news),
+                    'false_news_count': len(false_news)
+                }
+
+        except Exception as e:
+            self.logger.error(f"Error in retrain_model: {str(e)}")
+            return {
+                'success': False,
+                'message': f'Error during retraining: {str(e)}',
+                'true_news_count': 0,
+                'false_news_count': 0
             }

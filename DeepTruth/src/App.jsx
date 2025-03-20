@@ -42,6 +42,7 @@ function App() {
             url: url,
             title: `Source ${index + 1}`
           }));
+          console.log("SOURCES ARRAY: ", sourcesArray);
         } catch (error) {
           console.error("Error parsing sources:", error);
           sourcesArray = [];
@@ -191,7 +192,7 @@ function App() {
                   fontWeight: "bold",
                 }}
               >
-                Credibility
+                Confidence
               </h2>
               {renderCircularProgress(animatedCredibility, 180)}
             </div>
