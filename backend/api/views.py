@@ -5,70 +5,68 @@ from rest_framework import status
 from rest_framework.generics import ListAPIView
 from django.db.models import Q
 from .serializers import ClaimVerificationSerializer, FalseNewsSerializer, NewsArticleSerializer
-from .models import FalseNews, TrueNews
-from .services import CombinedAnalysisService, BraveNewsService, ModelTrainingService
+# from .models import FalseNews, TrueNews
+# from .services import CombinedAnalysisService, BraveNewsService, ModelTrainingService
+from .models import FalseNews
+from .services import BraveNewsService, GeminiService
 from datetime import datetime
 from django.utils import timezone
 
-class RetrainModelAPIView(APIView):
-    def post(self, request):
-        """
-        Retrain the DistilBERT model using data from MongoDB
-        """
-        try:
-            training_service = ModelTrainingService()
-            result = training_service.retrain_model()
+# class RetrainModelAPIView(APIView):
+#     def post(self, request):
+#         """
+#         Retrain the DistilBERT model using data from MongoDB
+#         """
+#         try:
+#             training_service = ModelTrainingService()
+#             result = training_service.retrain_model()
             
-            if result['success']:
-                return Response(result, status=status.HTTP_200_OK)
-            else:
-                return Response(result, status=status.HTTP_400_BAD_REQUEST)
+#             if result['success']:
+#                 return Response(result, status=status.HTTP_200_OK)
+#             else:
+#                 return Response(result, status=status.HTTP_400_BAD_REQUEST)
                 
-        except Exception as e:
-            return Response({
-                'success': False,
-                'message': f'Error during retraining: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         except Exception as e:
+#             return Response({
+#                 'success': False,
+#                 'message': f'Error during retraining: {str(e)}'
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VerifyClaimAPIView(APIView):
     def post(self, request):
+        article_title = request.data.get('article_title')
+        if not article_title:
+            return Response(
+                {'error': 'Article title is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
-            article_title = request.data.get('article_title')
-            if not article_title:
-                return Response(
-                    {'error': 'article_title is required'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Initialize services
+            brave_service = BraveNewsService()
+            gemini_service = GeminiService()
 
-            # Get news articles from Brave Search
-            combined_service = CombinedAnalysisService()
-            result = combined_service.analyze_claim(article_title)
+            # Get news articles from Brave
+            news_articles = brave_service.get_news_articles(article_title)
 
-            # Store the result in the appropriate collection based on veracity
-            if result['veracity']:
-                TrueNews.objects.create(
-                    article_title=article_title,
-                    veracity=result['veracity'],
-                    confidence_score=result['confidence_score'],
-                    explanation=result['explanation'],
-                    category=result['category'],
-                    key_findings=result['key_findings'],
-                    impact_level=result['impact_level'],
-                    sources=result['sources']
-                )
-            else:
-                FalseNews.objects.create(
-                    article_title=article_title,
-                    veracity=result['veracity'],
-                    confidence_score=result['confidence_score'],
-                    explanation=result['explanation'],
-                    category=result['category'],
-                    key_findings=result['key_findings'],
-                    impact_level=result['impact_level'],
-                    sources=result['sources']
-                )
+            # Analyze claim using Gemini
+            analysis_result = gemini_service.analyze_claim(article_title, news_articles)
 
-            return Response(result, status=status.HTTP_200_OK)
+            # Create FalseNews object with only the fields that exist in the model
+            false_news = FalseNews.objects.create(
+                article_title=article_title,
+                veracity=analysis_result.get('veracity', False),
+                confidence_score=analysis_result.get('confidence_score', 0.0),
+                explanation=analysis_result.get('explanation', ''),
+                category=analysis_result.get('category', 'Unknown'),
+                key_findings=analysis_result.get('key_findings', []),
+                impact_level=analysis_result.get('impact_level', 'PARTIAL'),
+                sources=analysis_result.get('sources', [])
+            )
+
+            # Serialize and return the response
+            serializer = FalseNewsSerializer(false_news)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             return Response(
