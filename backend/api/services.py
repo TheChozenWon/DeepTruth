@@ -4,6 +4,8 @@ import json
 from typing import List, Dict, Any
 from datetime import datetime
 from django.utils import timezone
+from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+import torch
 
 class BraveNewsService:
     def __init__(self):
@@ -77,6 +79,49 @@ class BraveNewsService:
                 'time_published': datetime.now().isoformat(),
                 'retrieved_at': datetime.now().isoformat()
             }]
+
+class DistilBERTService:
+
+    def __init__(self):
+        try:
+            self.tokenizer = DistilBertTokenizer.from_pretrained(
+                'distilbert-base-uncased'
+            )
+            self.model = DistilBertForSequenceClassification.from_pretrained(
+                'distilbert-base-uncased',
+                num_labels=2  # Binary classification (true/false)
+            )
+            self.model.eval()  # Set to evaluation mode
+        except Exception as e:
+            print(f"Error initializing DistilBERT model: {str(e)}")
+            raise ValueError(f"Failed to initialize DistilBERT model: {str(e)}")
+
+    def analyze_claim(self, title: str) -> float:
+        """
+        Analyze the claim using DistilBERT model
+        Returns confidence score between 0 and 1
+        """
+        try:
+            # Tokenize the input
+            inputs = self.tokenizer(
+                title,
+                return_tensors="pt",
+                truncation=True,
+                max_length=512,
+                padding=True
+            )
+
+            # Get prediction
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                probabilities = torch.softmax(outputs.logits, dim=1)
+                confidence_score = probabilities[0][1].item()  # Assuming 1 is true class
+            # print(confidence_score)
+            return confidence_score
+        except Exception as e:
+            print(f"DistilBERT Error: {str(e)}")
+            return 0.5  # Return neutral score on error
+
 
 class GeminiService:
     def __init__(self):
@@ -249,6 +294,8 @@ class CombinedAnalysisService:
             # Get Gemini analysis
             gemini_result = self.gemini_service.analyze_claim(article_title, brave_news)
             
+            distilbert_score = self.distilbert_service.analyze_claim(article_title)
+            
             # Process sources from Gemini and Brave
             gemini_sources = gemini_result.get('sources', [])
             brave_sources = [article.get('link', '') for article in brave_news if article.get('link')]
@@ -259,7 +306,7 @@ class CombinedAnalysisService:
             # Create result dictionary
             result = {
                 'veracity': gemini_result['veracity'],
-                'confidence_score': gemini_result['confidence_score'],
+                'confidence_score': (gemini_result['confidence_score'](0.8) + distilbert_score(0.2)) / 2,
                 'explanation': gemini_result['explanation'],
                 'category': gemini_result['category'],
                 'key_findings': gemini_result['key_findings'],
