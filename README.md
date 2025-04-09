@@ -5,6 +5,10 @@
   <p><em>Unveiling Truth in the Digital Age</em></p>
 </div>
 
+![image](https://github.com/user-attachments/assets/6ab275ae-9766-4517-bccc-764b51053b26)
+
+Frontend Link: https://github.com/jaydoshi2/Deeptruth-Frontend
+Backend Link: https://github.com/jaydoshi2/Deeptruth-Backend
 ## 🌟 Overview
 
 DeepTruth is an innovative fact-checking platform that combines the power of Google's Gemini AI and DistilBERT to provide real-time analysis of news articles and claims. Our Chrome extension makes it easy to verify information while browsing the web.
