@@ -8,6 +8,7 @@
 ![image](https://github.com/user-attachments/assets/6ab275ae-9766-4517-bccc-764b51053b26)
 
 Frontend Link: https://github.com/jaydoshi2/Deeptruth-Frontend
+
 Backend Link: https://github.com/jaydoshi2/Deeptruth-Backend
 ## 🌟 Overview
 
